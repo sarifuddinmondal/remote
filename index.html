@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini OS - GitHub Remote</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+
+    <style>
+        body { font-family: sans-serif; background: #1a1a1a; color: white; text-align: center; margin: 0; }
+        .status { padding: 15px; background: #333; font-size: 14px; border-bottom: 2px solid #444; }
+        .online { color: #4caf50; }
+        .offline { color: #f44336; }
+        .remote-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 20px; max-width: 350px; margin: 0 auto; }
+        button { background: #444; border: none; color: white; padding: 20px; border-radius: 10px; font-size: 16px; cursor: pointer; }
+        button:active { background: #666; transform: scale(0.98); }
+        .btn-main { background: #d32f2f; grid-column: span 3; font-weight: bold; }
+        .btn-nav { background: #3367d6; }
+        .btn-ok { background: #00897b; grid-column: span 3; height: 80px; font-size: 20px; }
+    </style>
+</head>
+<body>
+
+    <div id="status" class="status offline">🔴 PC Offline (Searching IP...)</div>
+
+    <div class="remote-grid">
+        <button class="btn-main" onclick="send('power_on')">POWER / HOME</button>
+
+        <div></div>
+        <button class="btn-nav" onclick="send('up')">▲</button>
+        <div></div>
+        
+        <button class="btn-nav" onclick="send('left')">◀</button>
+        <button class="btn-nav" onclick="send('down')">▼</button>
+        <button class="btn-nav" onclick="send('right')">▶</button>
+
+        <button class="btn-ok" onclick="send('enter')">OK</button>
+
+        <button onclick="send('vol_down')">VOL -</button>
+        <button style="background:#555" onclick="send('back')">BACK</button>
+        <button onclick="send('vol_up')">VOL +</button>
+    </div>
+
+    <script>
+        // ১. Aponar Firebase Config (Eita fixed)
+        const firebaseConfig = {
+            apiKey: "AIzaSyDL57aeNwn_mC8KQCdMEExigwLI9glCL_U",
+            authDomain: "remote-de28e.firebaseapp.com",
+            projectId: "remote-de28e",
+            databaseURL: "https://remote-de28e-default-rtdb.firebaseio.com",
+            storageBucket: "remote-de28e.firebasestorage.app",
+            messagingSenderId: "335259772350",
+            appId: "1:335259772350:web:4eeeeedee09a3b729c45ef"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        let socket;
+
+        // ২. Real-time IP Listener (Firebase theke IP nibe)
+        db.ref('server_config').on('value', (snapshot) => {
+            const data = snapshot.val();
+            if (data && data.current_ip) {
+                const ip = data.current_ip;
+                connectToPC(ip);
+            }
+        });
+
+        function connectToPC(ip) {
+            if (socket) socket.disconnect();
+            
+            // Local network connect hobe
+            socket = io.connect(`http://${ip}:5000`, { transports: ['websocket'] });
+
+            socket.on('connect', () => {
+                document.getElementById('status').innerHTML = `🟢 Online: ${ip}`;
+                document.getElementById('status').className = "status online";
+            });
+
+            socket.on('disconnect', () => {
+                document.getElementById('status').innerHTML = "🔴 PC Offline";
+                document.getElementById('status').className = "status offline";
+            });
+        }
+
+        // ৩. Command Send Function
+        function send(action) {
+            if (socket && socket.connected) {
+                socket.emit('system_control', { action: action });
+            } else {
+                alert("Server connect houni! PC-te app-ti run korun.");
+            }
+        }
+    </script>
+</body>
+</html>
