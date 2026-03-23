@@ -3,55 +3,110 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SmartOS TV Remote (Cloud)</title>
+    <title>SmartOS TV Remote</title>
     
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
 
     <style>
-        /* আপনার দেওয়া স্টাইলগুলো এখানে হুবহু থাকবে */
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body { background: #121212; color: white; font-family: 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 10px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        body { background: #121212; color: white; font-family: 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 10px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; overflow-x: hidden; }
+        
         #connection-status { font-size: 0.75rem; padding: 5px 15px; border-radius: 20px; margin-bottom: 10px; font-weight: bold; }
         .ready { background: #1a472a; color: #2ecc71; border: 1px solid #27ae60; }
         .waiting { background: #471a1a; color: #e74c3c; border: 1px solid #c0392b; }
-        .nav-wheel { width: 180px; height: 180px; background: #222; border-radius: 50%; position: relative; display: flex; align-items: center; justify-content: center; margin-bottom: 15px; border: 2px solid #333; }
-        .nav-btn { position: absolute; background: transparent; border: none; color: #888; font-size: 24px; cursor: pointer; width: 50px; height: 50px; }
-        .ok-btn { width: 70px; height: 70px; background: #333; border-radius: 50%; border: 3px solid #444; color: white; font-weight: bold; }
+
+        .header { font-size: 1.1rem; font-weight: bold; color: #0078d7; margin-bottom: 5px; text-transform: uppercase; }
+        #voice-status { height: 20px; color: #00d2ff; font-size: 0.8rem; margin-bottom: 5px; text-align: center; }
+
+        .power-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%; max-width: 320px; margin-bottom: 10px; }
+        .p-btn { padding: 12px; border: none; border-radius: 12px; font-weight: bold; color: white; cursor: pointer; font-size: 0.75rem; }
+        .btn-green { background: #27ae60; }
+        .btn-gray { background: #333; }
+        .btn-red-dark { background: #8e0000; }
+
+        #trackpad { width: 100%; height: 70px; background: rgba(255,255,255,0.05); border-radius: 20px; border: 1px dashed #444; display: flex; align-items: center; justify-content: center; color: #777; font-size: 0.7rem; margin-bottom: 10px; touch-action: none; text-transform: uppercase; text-align: center; padding: 10px; }
+
+        .nav-wheel { width: 180px; height: 180px; background: #222; border-radius: 50%; position: relative; display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); margin-bottom: 15px; border: 2px solid #333; }
+        .nav-btn { position: absolute; background: transparent; border: none; color: #888; font-size: 24px; cursor: pointer; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+        .ok-btn { width: 70px; height: 70px; background: #333; border-radius: 50%; border: 3px solid #444; color: white; font-weight: bold; font-size: 1rem; cursor: pointer; z-index: 5; }
+        
+        .num-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 100%; max-width: 320px; margin-bottom: 15px; }
+        .num-btn { background: #1a1a1a; border: 1px solid #333; border-radius: 10px; padding: 12px; color: #ccc; font-size: 1.2rem; font-weight: bold; cursor: pointer; }
+
+        .mid-controls { display: flex; justify-content: center; gap: 20px; width: 100%; max-width: 320px; margin-bottom: 15px; }
+        .circle-btn { width: 50px; height: 50px; border-radius: 50%; background: #2a2a2a; border: 1px solid #444; color: white; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+
         .controls-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 100%; max-width: 320px; }
-        .btn { background: #222; border: 1px solid #333; border-radius: 12px; padding: 12px; color: white; cursor: pointer; }
-        .btn-yt { background: #ff0000; grid-column: span 3; font-weight: bold; }
+        .btn { background: #222; border: 1px solid #333; border-radius: 12px; padding: 12px; color: white; font-size: 1rem; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .btn-blue { background: #0078d7; grid-column: span 3; }
+        .btn-del { background: #8e0000; color: #fff; font-weight: bold; }
+        .btn-l { background: #00d2ff; color: #000; font-weight: bold; }
+        .btn-yt { background: #ff0000; color: #fff; font-weight: bold; grid-column: span 3; }
+        .btn-live-tv { background: #f39c12; color: #000; font-weight: bold; border-radius: 10px; }
     </style>
 </head>
 <body>
 
-    <div id="connection-status" class="waiting">SEARCHING FOR PC...</div>
-    <div style="color:#0078d7; font-weight:bold; margin-bottom:10px;">GEMINI OS REMOTE</div>
+    <div id="connection-status" class="waiting">SEARCHING IP...</div>
+    <div class="header">SmartOS Remote</div>
+    <div id="voice-status"></div>
+
+    <div class="power-row">
+        <button class="p-btn btn-green" onclick="system('power_on')">⏻ ON</button>
+        <button class="p-btn btn-gray" onclick="system('power_off')">✕ CLOSE</button>
+        <button class="p-btn btn-red-dark" onclick="system('pc_shutdown')">💀 PC OFF</button>
+    </div>
+
+    <div id="trackpad">Touch & Swipe to Move Cursor</div>
 
     <div class="nav-wheel">
-        <button class="nav-btn" style="top:5px;" onclick="system('up')">▲</button>
-        <button class="nav-btn" style="bottom:5px;" onclick="system('down')">▼</button>
-        <button class="nav-btn" style="left:5px;" onclick="system('left')">◀</button>
-        <button class="nav-btn" style="right:5px;" onclick="system('right')">▶</button>
-        <button class="ok-btn" onclick="system('enter')">OK</button>
+        <button class="nav-btn" style="top:5px;" onclick="key('up')">▲</button>
+        <button class="nav-btn" style="bottom:5px;" onclick="key('down')">▼</button>
+        <button class="nav-btn" style="left:5px;" onclick="key('left')">◀</button>
+        <button class="nav-btn" style="right:5px;" onclick="key('right')">▶</button>
+        <button class="ok-btn" onclick="sendEnter()">OK</button>
+    </div>
+
+    <div class="num-pad">
+        <button class="num-btn" onclick="sendNum('1')">1</button>
+        <button class="num-btn" onclick="sendNum('2')">2</button>
+        <button class="num-btn" onclick="sendNum('3')">3</button>
+        <button class="num-btn" onclick="sendNum('4')">4</button>
+        <button class="num-btn" onclick="sendNum('5')">5</button>
+        <button class="num-btn" onclick="sendNum('6')">6</button>
+        <button class="num-btn" onclick="sendNum('7')">7</button>
+        <button class="num-btn" onclick="sendNum('8')">8</button>
+        <button class="num-btn" onclick="sendNum('9')">9</button>
+        <button class="num-btn btn-live-tv" onclick="openApp('live_tv')">LIVE</button>
+        <button class="num-btn" onclick="sendNum('0')">0</button>
+        <button class="num-btn" onclick="system('enter')">⏎</button>
+    </div>
+
+    <div class="mid-controls">
+        <button class="circle-btn" onclick="system('back')">↩</button>
+        <button id="micBtn" class="circle-btn" onclick="startVoice()">🎤</button>
+        <button class="circle-btn" onclick="system('mute')">🔇</button>
     </div>
 
     <div class="controls-grid">
-        <button class="btn" onclick="system('vol_down')">🔉</button>
+        <button class="btn" onclick="volControl('down')">🔉</button>
         <button class="btn" onclick="system('play_pause')">⏯️</button>
-        <button class="btn" onclick="system('vol_up')">🔊</button>
+        <button class="btn" onclick="volControl('up')">🔊</button>
+        <button class="btn btn-del" onclick="socket.emit('system_control', {action: 'delete'})">D (DELETE)</button>
+        <button class="btn btn-l" onclick="socket.emit('system_control', {action: 'list'})">L (LIST)</button>
         <button class="btn btn-yt" onclick="openApp('youtube')">▶ YOUTUBE</button>
-        <button class="btn" style="grid-column: span 3; background:#333;" onclick="system('home')">🏠 HOME</button>
+        <button class="btn btn-blue" onclick="system('home')">🏠 Gemini OS Dashboard</button>
     </div>
 
     <script>
-        // আপনার ফায়ারবেস কনফিগারেশন
+        // --- ১. Firebase Config ---
         const firebaseConfig = {
             apiKey: "AIzaSyDL57aeNwn_mC8KQCdMEExigwLI9glCL_U",
             authDomain: "remote-de28e.firebaseapp.com",
             projectId: "remote-de28e",
-            databaseURL: "https://remote-de28e-default-rtdb.firebaseio.com/",
+            databaseURL: "https://remote-de28e-default-rtdb.firebaseio.com",
             storageBucket: "remote-de28e.firebasestorage.app",
             messagingSenderId: "335259772350",
             appId: "1:335259772350:web:4eeeeedee09a3b729c45ef"
@@ -59,39 +114,60 @@
 
         firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
+        
         let socket;
         const statusEl = document.getElementById('connection-status');
 
-        // ফায়ারবেস থেকে আইপি রিড করা
+        // --- ২. Real-time IP Listener ---
         database.ref('server_config').on('value', (snapshot) => {
             const data = snapshot.val();
             if (data && data.current_ip) {
-                const ip = data.current_ip;
-                console.log("PC IP Found: " + ip);
-                connectSocket(ip);
+                const pcIP = data.current_ip;
+                console.log("PC IP Found: " + pcIP);
+                initSocket(pcIP);
             }
         });
 
-        function connectSocket(ip) {
+        function initSocket(ip) {
             if (socket) socket.disconnect();
-            
-            socket = io(`http://${ip}:5000`, { transports: ['websocket'] });
+
+            // আপনার পিসি IP এবং Port (5000) দিয়ে কানেক্ট হচ্ছে
+            socket = io(`http://${ip}:5000`, { 
+                reconnection: true,
+                transports: ['websocket'] 
+            });
 
             socket.on('connect', () => {
-                statusEl.innerText = "CONNECTED TO PC (" + ip + ")";
+                statusEl.innerText = "GEMINI READY (" + ip + ")";
                 statusEl.className = "ready";
+                vibrate(100);
             });
 
             socket.on('disconnect', () => {
-                statusEl.innerText = "OFFLINE - SEARCHING...";
+                statusEl.innerText = "CONNECTING...";
                 statusEl.className = "waiting";
             });
         }
 
-        // কন্ট্রোল ফাংশন
-        function system(action) { if(socket) socket.emit('system_control', {action: action}); vibrate(); }
-        function openApp(name) { if(socket) socket.emit('open_app', {name: name}); vibrate(); }
-        function vibrate() { if(navigator.vibrate) navigator.vibrate(40); }
+        // --- ৩. Remote Functions ---
+        function openApp(name) { if(socket) socket.emit('open_app', {name: name}); vibrate(50); }
+        function volControl(dir) { if(socket) socket.emit('system_control', {action: 'vol_' + dir}); vibrate(30); }
+        function sendNum(n) { if(socket) socket.emit('system_control', {action: n}); vibrate(40); }
+        function sendEnter() { if(socket) socket.emit('system_control', {action: 'enter'}); vibrate(60); }
+        function system(action) { if(socket) socket.emit('system_control', {action: action}); vibrate(50); }
+        function key(dir) { if(socket) socket.emit('system_control', {action: dir}); vibrate(30); }
+        
+        function vibrate(ms = 40) { if (navigator.vibrate) navigator.vibrate(ms); }
+        
+        function startVoice() {
+            const status = document.getElementById('voice-status');
+            status.innerText = "Listening...";
+            vibrate(100);
+            setTimeout(() => { status.innerText = ""; }, 2000);
+        }
+
+        // অটো-রিফ্রেশ যদি ৩০ মিনিট কানেকশন না থাকে
+        setInterval(() => { if(!socket || !socket.connected) location.reload(); }, 1800000);
     </script>
 </body>
 </html>
