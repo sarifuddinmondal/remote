@@ -130,8 +130,6 @@
 
         function initSocket(ip) {
             if (socket) socket.disconnect();
-
-            // আপনার পিসি IP এবং Port (5000) দিয়ে কানেক্ট হচ্ছে
             socket = io(`http://${ip}:5000`, { 
                 reconnection: true,
                 transports: ['websocket'] 
@@ -149,24 +147,69 @@
             });
         }
 
-        // --- ৩. Remote Functions ---
+        // --- ৩. Mouse Control Logic (Trackpad) ---
+        const trackpad = document.getElementById('trackpad');
+        let lastX, lastY;
+
+        trackpad.addEventListener('touchstart', e => {
+            lastX = e.touches[0].clientX;
+            lastY = e.touches[0].clientY;
+        });
+
+        trackpad.addEventListener('touchmove', e => {
+            if (!socket || !socket.connected) return;
+            const x = e.touches[0].clientX;
+            const y = e.touches[0].clientY;
+            const dx = (x - lastX) * 2; // Sensitivity multiplier
+            const dy = (y - lastY) * 2;
+            
+            socket.emit('mouse_move', { x: dx, y: dy });
+            lastX = x; lastY = y;
+            e.preventDefault();
+        }, { passive: false });
+
+        trackpad.addEventListener('touchend', e => {
+            // চাইলে এখানে সিঙ্গেল ট্যাপে ক্লিক লজিক দেয়া যায়
+        });
+
+        // --- ৪. Remote Functions ---
         function openApp(name) { if(socket) socket.emit('open_app', {name: name}); vibrate(50); }
         function volControl(dir) { if(socket) socket.emit('system_control', {action: 'vol_' + dir}); vibrate(30); }
         function sendNum(n) { if(socket) socket.emit('system_control', {action: n}); vibrate(40); }
-        function sendEnter() { if(socket) socket.emit('system_control', {action: 'enter'}); vibrate(60); }
+        function sendEnter() { if(socket) socket.emit('mouse_click', {button: 'left'}); vibrate(60); }
         function system(action) { if(socket) socket.emit('system_control', {action: action}); vibrate(50); }
         function key(dir) { if(socket) socket.emit('system_control', {action: dir}); vibrate(30); }
         
         function vibrate(ms = 40) { if (navigator.vibrate) navigator.vibrate(ms); }
         
+        // --- ৫. Voice Search Function ---
         function startVoice() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                alert("Voice Search not supported in this browser.");
+                return;
+            }
+            const recognition = new SpeechRecognition();
             const status = document.getElementById('voice-status');
-            status.innerText = "Listening...";
-            vibrate(100);
-            setTimeout(() => { status.innerText = ""; }, 2000);
+            
+            recognition.onstart = () => {
+                status.innerText = "Listening...";
+                vibrate(100);
+            };
+            
+            recognition.onresult = (event) => {
+                const query = event.results[0][0].transcript;
+                status.innerText = "Searching: " + query;
+                if(socket) socket.emit('voice_search', { query: query });
+            };
+            
+            recognition.onend = () => {
+                setTimeout(() => { status.innerText = ""; }, 2000);
+            };
+            
+            recognition.start();
         }
 
-        // অটো-রিফ্রেশ যদি ৩০ মিনিট কানেকশন না থাকে
         setInterval(() => { if(!socket || !socket.connected) location.reload(); }, 1800000);
     </script>
 </body>
