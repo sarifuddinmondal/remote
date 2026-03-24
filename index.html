@@ -170,7 +170,6 @@
             const dx = (x - lastX) * 2;
             const dy = (y - lastY) * 2;
             
-            // Firebase এবং Socket দুটিতেই ডেটা পাঠাবে
             const payload = { type: 'mouse', action: 'move', x: dx, y: dy };
             if (socket && socket.connected) socket.emit('mouse_move', payload);
             sendToFirebase(payload);
@@ -179,63 +178,66 @@
             e.preventDefault();
         }, { passive: false });
 
-        // --- ৫. Remote Functions (Updated for Firebase) ---
+        // --- ৫. Remote Functions (Socket + Firebase) ---
         function openApp(name) { 
             const payload = { type: 'app', action: name };
-            if(socket) socket.emit('open_app', {name: name}); 
+            if(socket && socket.connected) socket.emit('open_app', {name: name}); 
             sendToFirebase(payload);
             vibrate(50); 
         }
 
         function volControl(dir) { 
-            const payload = { type: 'key', action: 'vol_' + dir };
-            if(socket) socket.emit('system_control', {action: 'vol_' + dir}); 
+            const payload = { type: 'system', action: 'vol_' + dir };
+            if(socket && socket.connected) socket.emit('system_control', {action: 'vol_' + dir}); 
             sendToFirebase(payload);
             vibrate(30); 
         }
 
         function sendNum(n) { 
             const payload = { type: 'num', action: n };
-            if(socket) socket.emit('system_control', {action: n}); 
+            if(socket && socket.connected) socket.emit('system_control', {action: n}); 
             sendToFirebase(payload);
             vibrate(40); 
         }
 
+        // OK বাটন ফিক্স: মাউস ক্লিক এবং সিস্টেম এন্টার দুইটাই ট্রিগার করবে
         function sendEnter() { 
             const payload = { type: 'mouse', action: 'click' };
-            if(socket) socket.emit('mouse_click', {button: 'left'}); 
+            if(socket && socket.connected) {
+                socket.emit('mouse_click', {button: 'left'});
+                socket.emit('system_control', {action: 'enter'});
+            }
             sendToFirebase(payload);
             vibrate(60); 
         }
 
         function system(action) { 
             const payload = { type: 'system', action: action };
-            if(socket) socket.emit('system_control', {action: action}); 
+            if(socket && socket.connected) socket.emit('system_control', {action: action}); 
             sendToFirebase(payload);
             vibrate(50); 
         }
 
         function key(dir) { 
-            const payload = { type: 'key', action: dir };
-            if(socket) socket.emit('system_control', {action: dir}); 
+            const payload = { type: 'system', action: dir };
+            if(socket && socket.connected) socket.emit('system_control', {action: dir}); 
             sendToFirebase(payload);
             vibrate(30); 
         }
 
         function sendAction(act) {
             const payload = { type: 'system', action: act };
-            if(socket) socket.emit('system_control', {action: act});
+            if(socket && socket.connected) socket.emit('system_control', {action: act});
             sendToFirebase(payload);
             vibrate(40);
         }
         
         function vibrate(ms = 40) { if (navigator.vibrate) navigator.vibrate(ms); }
         
-        // --- ৬. Voice Search Function ---
         function startVoice() {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!SpeechRecognition) {
-                alert("Voice Search not supported in this browser.");
+                alert("Voice Search not supported.");
                 return;
             }
             const recognition = new SpeechRecognition();
@@ -250,7 +252,7 @@
                 const query = event.results[0][0].transcript;
                 status.innerText = "Searching: " + query;
                 const payload = { type: 'voice', action: 'search', query: query };
-                if(socket) socket.emit('voice_search', { query: query });
+                if(socket && socket.connected) socket.emit('voice_search', { query: query });
                 sendToFirebase(payload);
             };
             
