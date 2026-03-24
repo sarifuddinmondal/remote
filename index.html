@@ -94,8 +94,8 @@
         <button class="btn" onclick="volControl('down')">🔉</button>
         <button class="btn" onclick="system('play_pause')">⏯️</button>
         <button class="btn" onclick="volControl('up')">🔊</button>
-        <button class="btn btn-del" onclick="socket.emit('system_control', {action: 'delete'})">D (DELETE)</button>
-        <button class="btn btn-l" onclick="socket.emit('system_control', {action: 'list'})">L (LIST)</button>
+        <button class="btn btn-del" onclick="sendAction('delete')">D (DELETE)</button>
+        <button class="btn btn-l" onclick="sendAction('list')">L (LIST)</button>
         <button class="btn btn-yt" onclick="openApp('youtube')">▶ YOUTUBE</button>
         <button class="btn btn-blue" onclick="system('home')">🏠 Gemini OS Dashboard</button>
     </div>
@@ -106,7 +106,6 @@
             apiKey: "AIzaSyDL57aeNwn_mC8KQCdMEExigwLI9glCL_U",
             authDomain: "remote-de28e.firebaseapp.com",
             projectId: "remote-de28e",
-            // এখানে আপনার এশিয়ান সার্ভার লোকেশন অনুযায়ী আপডেট করা হয়েছে
             databaseURL: "https://remote-de28e-default-rtdb.asia-southeast1.firebasedatabase.app/",
             storageBucket: "remote-de28e.firebasestorage.app",
             messagingSenderId: "335259772350",
@@ -119,7 +118,15 @@
         let socket;
         const statusEl = document.getElementById('connection-status');
 
-        // --- ২. Real-time IP Listener ---
+        // --- ২. Firebase-এ কমান্ড পাঠানোর কোর ফাংশন ---
+        function sendToFirebase(payload) {
+            database.ref('remote_commands').set({
+                ...payload,
+                timestamp: Date.now()
+            });
+        }
+
+        // --- ৩. Real-time IP Listener ---
         database.ref('server_config').on('value', (snapshot) => {
             const data = snapshot.val();
             if (data && data.current_ip) {
@@ -148,7 +155,7 @@
             });
         }
 
-        // --- ৩. Mouse Control Logic (Trackpad) ---
+        // --- ৪. Mouse Control Logic (Trackpad) ---
         const trackpad = document.getElementById('trackpad');
         let lastX, lastY;
 
@@ -158,32 +165,73 @@
         });
 
         trackpad.addEventListener('touchmove', e => {
-            if (!socket || !socket.connected) return;
             const x = e.touches[0].clientX;
             const y = e.touches[0].clientY;
-            const dx = (x - lastX) * 2; // Sensitivity multiplier
+            const dx = (x - lastX) * 2;
             const dy = (y - lastY) * 2;
             
-            socket.emit('mouse_move', { x: dx, y: dy });
+            // Firebase এবং Socket দুটিতেই ডেটা পাঠাবে
+            const payload = { type: 'mouse', action: 'move', x: dx, y: dy };
+            if (socket && socket.connected) socket.emit('mouse_move', payload);
+            sendToFirebase(payload);
+
             lastX = x; lastY = y;
             e.preventDefault();
         }, { passive: false });
 
-        trackpad.addEventListener('touchend', e => {
-            // চাইলে এখানে সিঙ্গেল ট্যাপে ক্লিক লজিক দেয়া যায়
-        });
+        // --- ৫. Remote Functions (Updated for Firebase) ---
+        function openApp(name) { 
+            const payload = { type: 'app', action: name };
+            if(socket) socket.emit('open_app', {name: name}); 
+            sendToFirebase(payload);
+            vibrate(50); 
+        }
 
-        // --- ৪. Remote Functions ---
-        function openApp(name) { if(socket) socket.emit('open_app', {name: name}); vibrate(50); }
-        function volControl(dir) { if(socket) socket.emit('system_control', {action: 'vol_' + dir}); vibrate(30); }
-        function sendNum(n) { if(socket) socket.emit('system_control', {action: n}); vibrate(40); }
-        function sendEnter() { if(socket) socket.emit('mouse_click', {button: 'left'}); vibrate(60); }
-        function system(action) { if(socket) socket.emit('system_control', {action: action}); vibrate(50); }
-        function key(dir) { if(socket) socket.emit('system_control', {action: dir}); vibrate(30); }
+        function volControl(dir) { 
+            const payload = { type: 'key', action: 'vol_' + dir };
+            if(socket) socket.emit('system_control', {action: 'vol_' + dir}); 
+            sendToFirebase(payload);
+            vibrate(30); 
+        }
+
+        function sendNum(n) { 
+            const payload = { type: 'num', action: n };
+            if(socket) socket.emit('system_control', {action: n}); 
+            sendToFirebase(payload);
+            vibrate(40); 
+        }
+
+        function sendEnter() { 
+            const payload = { type: 'mouse', action: 'click' };
+            if(socket) socket.emit('mouse_click', {button: 'left'}); 
+            sendToFirebase(payload);
+            vibrate(60); 
+        }
+
+        function system(action) { 
+            const payload = { type: 'system', action: action };
+            if(socket) socket.emit('system_control', {action: action}); 
+            sendToFirebase(payload);
+            vibrate(50); 
+        }
+
+        function key(dir) { 
+            const payload = { type: 'key', action: dir };
+            if(socket) socket.emit('system_control', {action: dir}); 
+            sendToFirebase(payload);
+            vibrate(30); 
+        }
+
+        function sendAction(act) {
+            const payload = { type: 'system', action: act };
+            if(socket) socket.emit('system_control', {action: act});
+            sendToFirebase(payload);
+            vibrate(40);
+        }
         
         function vibrate(ms = 40) { if (navigator.vibrate) navigator.vibrate(ms); }
         
-        // --- ৫. Voice Search Function ---
+        // --- ৬. Voice Search Function ---
         function startVoice() {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!SpeechRecognition) {
@@ -201,7 +249,9 @@
             recognition.onresult = (event) => {
                 const query = event.results[0][0].transcript;
                 status.innerText = "Searching: " + query;
+                const payload = { type: 'voice', action: 'search', query: query };
                 if(socket) socket.emit('voice_search', { query: query });
+                sendToFirebase(payload);
             };
             
             recognition.onend = () => {
